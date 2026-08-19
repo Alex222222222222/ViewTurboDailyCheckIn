@@ -27,6 +27,11 @@ spec:
               ports:
                 - name: browser
                   containerPort: 3000
+              startupProbe:
+                tcpSocket:
+                  port: browser
+                periodSeconds: 1
+                failureThreshold: 180
               volumeMounts:
                 - name: browser-shm
                   mountPath: /dev/shm

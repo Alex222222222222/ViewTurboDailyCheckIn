@@ -21,6 +21,27 @@ test("decodes pipe-separated accounts", () => {
   );
 });
 
+test("extracts tokens from structured user JSON", () => {
+  const users = [
+    JSON.stringify({ token: "token-one", email: "one@example.com" }),
+    JSON.stringify({ token: "token-two", loginPassword: "not-needed" })
+  ];
+
+  assert.deepEqual(
+    decodeAccounts(Buffer.from(users.join("|")).toString("base64"), undefined),
+    [
+      { source: "token", token: "token-one" },
+      { source: "token", token: "token-two" }
+    ]
+  );
+});
+
+test("rejects structured user JSON without a token", () => {
+  const encoded = Buffer.from(JSON.stringify({ email: "one@example.com" })).toString("base64");
+
+  assert.throws(() => decodeAccounts(encoded, undefined), /requires a non-empty token/);
+});
+
 test("rejects missing, malformed, and entirely empty accounts", () => {
   assert.throws(() => decodeAccounts(undefined, undefined), /is required/);
   assert.throws(() => decodeAccounts("not base64", undefined), /valid base64/);

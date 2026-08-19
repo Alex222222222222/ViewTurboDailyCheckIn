@@ -9,6 +9,24 @@ interface LoginCredentials {
   password: string;
 }
 
+function extractToken(value: string, index: number): string {
+  if (!value.startsWith("{")) return value;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error(`TOKEN_BASE64 account ${index} contains invalid user JSON`);
+  }
+
+  const token = (parsed as { token?: unknown } | null)?.token;
+  if (typeof token !== "string" || !token.trim()) {
+    throw new Error(`TOKEN_BASE64 account ${index} user JSON requires a non-empty token`);
+  }
+
+  return token.trim();
+}
+
 function decodeBase64(encoded: string, variable: string): string {
   const compact = encoded.trim();
   if (!compact || compact.length % 4 !== 0 || !BASE64_PATTERN.test(compact)) {
@@ -35,7 +53,12 @@ export function decodeAccounts(
       warn(`TOKEN_BASE64 contains ${skipped} empty account(s); skipping them`);
     }
 
-    accounts.push(...validTokens.map((token) => ({ source: "token" as const, token })));
+    accounts.push(
+      ...validTokens.map((value, index) => ({
+        source: "token" as const,
+        token: extractToken(value, index + 1)
+      }))
+    );
   }
 
   if (encodedLogins) {
