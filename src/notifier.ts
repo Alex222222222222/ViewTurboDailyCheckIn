@@ -12,8 +12,14 @@ export interface SmtpConfig {
 
 export interface FailureSummary {
   account?: number;
+  accountLabel?: string;
   status: string;
   message: string;
+}
+
+export interface FailureNotification {
+  subject: string;
+  text: string;
 }
 
 const SMTP_KEYS = [
@@ -53,6 +59,25 @@ export function readSmtpConfig(env: NodeJS.ProcessEnv): SmtpConfig | undefined {
   };
 }
 
+export function formatFailureNotification(
+  failures: FailureSummary[]
+): FailureNotification {
+  const details = failures.map((failure) => {
+    const account = failure.account === undefined
+      ? "job"
+      : `account ${failure.account}${failure.accountLabel ? ` (${failure.accountLabel})` : ""}`;
+    return `- ${account}: ${failure.status}: ${failure.message}`;
+  });
+
+  return {
+    subject: `[ViewTurbo Daily] ${failures.length} account failure(s)`,
+    text: [
+      "ViewTurbo Daily encountered the following failure(s):", "",
+      ...details, "", `Time: ${new Date().toISOString()}`
+    ].join("\n")
+  };
+}
+
 export async function sendFailureNotification(
   config: SmtpConfig,
   failures: FailureSummary[]
@@ -64,18 +89,10 @@ export async function sendFailureNotification(
     requireTLS: config.tls && config.port !== 465,
     auth: { user: config.user, pass: config.password }
   });
-  const details = failures.map((failure) => {
-    const account = failure.account === undefined ? "job" : `account ${failure.account}`;
-    return `- ${account}: ${failure.status}: ${failure.message}`;
-  });
 
   await transporter.sendMail({
     from: config.from,
     to: config.to,
-    subject: `[ViewTurbo Daily] ${failures.length} account failure(s)`,
-    text: [
-      "ViewTurbo Daily encountered the following failure(s):", "",
-      ...details, "", `Time: ${new Date().toISOString()}`
-    ].join("\n")
+    ...formatFailureNotification(failures)
   });
 }

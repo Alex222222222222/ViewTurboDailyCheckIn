@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readSmtpConfig } from "../src/notifier.js";
+import { formatFailureNotification, readSmtpConfig } from "../src/notifier.js";
 
 test("disables SMTP when no SMTP variables are present", () => {
   assert.equal(readSmtpConfig({}), undefined);
@@ -26,4 +26,25 @@ test("validates partial and malformed SMTP configuration", () => {
   };
   assert.throws(() => readSmtpConfig({ ...base, SMTP_PORT: "bad", SMTP_TLS: "true" }), /SMTP_PORT must/);
   assert.throws(() => readSmtpConfig({ ...base, SMTP_PORT: "587", SMTP_TLS: "yes" }), /SMTP_TLS must/);
+});
+
+test("failure notifications identify affected accounts", () => {
+  const notification = formatFailureNotification([
+    {
+      account: 1,
+      accountLabel: "token ending ...6cKf",
+      status: "login_failed",
+      message: "account status did not load"
+    },
+    {
+      account: 2,
+      accountLabel: "person@example.com",
+      status: "error",
+      message: "check-in failed"
+    }
+  ]);
+
+  assert.equal(notification.subject, "[ViewTurbo Daily] 2 account failure(s)");
+  assert.match(notification.text, /account 1 \(token ending \.\.\.6cKf\): login_failed/);
+  assert.match(notification.text, /account 2 \(person@example\.com\): error/);
 });

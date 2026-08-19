@@ -29,12 +29,20 @@ class LoginError extends Error {
 
 interface Result {
   account?: number;
+  accountLabel?: string;
   status: CheckInStatus;
   message: string;
 }
 
 function output(result: Result): void {
   process.stdout.write(`${JSON.stringify(result)}\n`);
+}
+
+function accountLabel(credentials: AccountCredentials): string {
+  if (credentials.source === "login") return credentials.email;
+
+  const suffix = credentials.token.slice(-4);
+  return `token ending ...${suffix}`;
 }
 
 function errorMessage(error: unknown): string {
@@ -230,12 +238,14 @@ async function main(): Promise<void> {
     const failures: FailureSummary[] = [];
     for (const [index, credentials] of accounts.entries()) {
       const account = index + 1;
+      const label = accountLabel(credentials);
       try {
-        output(await checkIn(browser, credentials, account, timeout));
+        output({ ...await checkIn(browser, credentials, account, timeout), accountLabel: label });
       } catch (error: unknown) {
         failed = true;
         const result: Result = {
           account,
+          accountLabel: label,
           status: error instanceof LoginError ? "login_failed" : "error",
           message: errorMessage(error)
         };
