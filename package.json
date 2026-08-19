@@ -1,0 +1,26 @@
+{
+  "name": "viewturbo-daily",
+  "version": "1.0.0",
+  "private": true,
+  "description": "One-shot ViewTurbo daily check-in job",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "nodemailer": "^9.0.5",
+    "puppeteer-core": "24.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "@types/nodemailer": "^8.0.1",
+    "tsx": "4.20.4",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
