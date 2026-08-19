@@ -38,7 +38,14 @@ function output(result: Result): void {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
 }
 
 async function getStatusText(page: Page): Promise<string> {
@@ -134,30 +141,10 @@ async function checkIn(
 
     try {
       await page.waitForFunction(
-        (selector: string) => {
-          const path = window.location.pathname.replace(/\/$/, "");
-          return path !== "/zh/my" || document.querySelector(selector) !== null;
-        },
-        { timeout },
-        STATUS_SELECTOR
-      );
-    } catch {
-      throw new LoginError(
-        `failed to log in: check-in control not found (final URL: ${page.url()})`
-      );
-    }
-
-    if (new URL(page.url()).pathname.replace(/\/$/, "") !== "/zh/my") {
-      throw new LoginError(`failed to log in: redirected to ${page.url()}`);
-    }
-
-    await page.waitForSelector(STATUS_SELECTOR, { visible: true, timeout });
-
-    try {
-      await page.waitForFunction(
         (selector: string, checked: string, unchecked: string) => {
+          const path = window.location.pathname.replace(/\/$/, "");
           const text = document.querySelector(selector)?.textContent ?? "";
-          return text.includes(checked) || text.includes(unchecked);
+          return path !== "/zh/my" || text.includes(checked) || text.includes(unchecked);
         },
         { timeout },
         STATUS_SELECTOR,
@@ -165,10 +152,16 @@ async function checkIn(
         UNCHECKED_TEXT
       );
     } catch {
-      const unsettled = await getStatusText(page);
+      const unsettled = await page
+        .$eval(STATUS_SELECTOR, (element) => element.textContent?.trim() ?? "")
+        .catch(() => "");
       throw new LoginError(
-        `failed to log in: account status did not load within ${timeout}ms (last status: ${JSON.stringify(unsettled)})`
+        `failed to log in: account status did not load within ${timeout}ms (final URL: ${page.url()}, last status: ${JSON.stringify(unsettled)})`
       );
+    }
+
+    if (new URL(page.url()).pathname.replace(/\/$/, "") !== "/zh/my") {
+      throw new LoginError(`failed to log in: redirected to ${page.url()}`);
     }
 
     const before = await getStatusText(page);
