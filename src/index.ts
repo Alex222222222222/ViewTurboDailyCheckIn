@@ -45,6 +45,24 @@ async function getStatusText(page: Page): Promise<string> {
   return page.$eval(STATUS_SELECTOR, (element) => element.textContent?.trim() ?? "");
 }
 
+async function connectToBrowser(endpoint: string, timeout: number): Promise<Browser> {
+  const deadline = Date.now() + timeout;
+  let lastError: unknown;
+
+  do {
+    try {
+      return await puppeteer.connect({ browserWSEndpoint: endpoint });
+    } catch (error: unknown) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+    }
+  } while (Date.now() < deadline);
+
+  throw new Error(
+    `failed to connect to browser service within ${timeout}ms: ${errorMessage(lastError)}`
+  );
+}
+
 async function login(page: Page, credentials: Extract<AccountCredentials, { source: "login" }>, timeout: number): Promise<void> {
   await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout });
 
@@ -203,14 +221,17 @@ async function main(): Promise<void> {
   const timeout = readTimeout(process.env.TIMEOUT_MS);
   const smtp = readSmtpConfig(process.env);
   const executablePath = process.env.CHROMIUM_PATH || "/usr/bin/chromium";
+  const browserWSEndpoint = process.env.BROWSER_WS_ENDPOINT;
   let browser: Browser | undefined;
 
   try {
-    browser = await puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
-    });
+    browser = browserWSEndpoint
+      ? await connectToBrowser(browserWSEndpoint, timeout)
+      : await puppeteer.launch({
+          executablePath,
+          headless: true,
+          args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+        });
 
     let failed = false;
     const failures: FailureSummary[] = [];

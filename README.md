@@ -32,24 +32,30 @@ when the decoded input contains no usable tokens.
 Published image:
 
 ```text
-ghcr.io/zifanhua/viewturbodaily:latest
+ghcr.io/<github-owner>/<repository>:latest
 ```
 
-Pull it directly from GitHub Container Registry:
+The workflow derives this path from the actual GitHub repository and converts
+it to lowercase. For example, `ExampleOrg/ViewTurboDaily` publishes as:
+
+```text
+ghcr.io/exampleorg/viewturbodaily:latest
+```
+
+The application image does not contain Chromium. It connects to a Browserless
+Chromium container through `BROWSER_WS_ENDPOINT`, keeping builds smaller and
+allowing the browser to run as a Compose service or Kubernetes sidecar.
+
+Run both containers locally:
 
 ```sh
-docker pull ghcr.io/zifanhua/viewturbodaily:latest
+export BROWSERLESS_TOKEN="replace-with-a-random-secret"
+docker compose up --build --abort-on-container-exit --exit-code-from checkin
 ```
 
-Or build it locally:
-
-```sh
-docker build -t viewturbo-daily .
-docker run --rm \
-  -e TOKEN_BASE64="$TOKEN_BASE64" \
-  -e LOGIN_CREDENTIALS_BASE64="$LOGIN_CREDENTIALS_BASE64" \
-  viewturbo-daily
-```
+Compose connects the job to `ws://browser:3000` and gives Chromium a 2 GiB
+shared-memory allocation. Set `CHECKIN_IMAGE` if you adapt the Compose file to
+pull the published application image instead of building locally.
 
 Example output:
 
@@ -103,60 +109,17 @@ SMTP variable requires all other values except `SMTP_FROM`.
 
 ## Kubernetes CronJob
 
-Store the encoded value in a Secret and expose it as an environment variable:
+[kubernetes-cronjob.yaml](kubernetes-cronjob.yaml) uses Browserless as a native
+sidecar and memory-backed `/dev/shm`. Before applying it:
 
-```yaml
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: viewturbo-daily
-spec:
-  schedule: "0 1 * * *"
-  jobTemplate:
-    spec:
-      template:
-        spec:
-          restartPolicy: Never
-          containers:
-            - name: check-in
-              image: ghcr.io/zifanhua/viewturbodaily:latest
-              env:
-                - name: TOKEN_BASE64
-                  valueFrom:
-                    secretKeyRef:
-                      name: viewturbo-cookie
-                      key: token-base64
-                - name: LOGIN_CREDENTIALS_BASE64
-                  valueFrom:
-                    secretKeyRef:
-                      name: viewturbo-cookie
-                      key: login-credentials-base64
-                - name: SMTP_HOST
-                  value: smtp.example.com
-                - name: SMTP_PORT
-                  value: "587"
-                - name: SMTP_TLS
-                  value: "true"
-                - name: SMTP_USER
-                  valueFrom:
-                    secretKeyRef:
-                      name: viewturbo-smtp
-                      key: user
-                - name: SMTP_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: viewturbo-smtp
-                      key: password
-                - name: SMTP_TO
-                  value: target@example.com
-              resources:
-                requests:
-                  memory: 256Mi
-                  cpu: 100m
-                limits:
-                  memory: 512Mi
-                  cpu: 500m
-```
+1. Replace `ghcr.io/GITHUB_OWNER/REPOSITORY:latest` with the lowercase image URL
+   printed by the GitHub workflow.
+2. Create `viewturbo-cookie` with the account input.
+3. Create `viewturbo-browser` with `token` and an `endpoint` value formatted as
+   `ws://localhost:3000?token=<the-same-token>`.
+
+The native sidecar uses `restartPolicy: Always` under `initContainers`, allowing
+Kubernetes to stop Browserless automatically when the one-shot job exits.
 
 Base64 is encoding, not encryption. Kubernetes Secret manifests also expect
 their `data` values to be base64-encoded, so use `stringData` when creating a

@@ -28,7 +28,7 @@ function readBoolean(value: string, variable: string): boolean {
 }
 
 export function readSmtpConfig(env: NodeJS.ProcessEnv): SmtpConfig | undefined {
-  if (!SMTP_KEYS.some((key) => env[key] !== undefined)) return undefined;
+  if (!SMTP_KEYS.some((key) => Boolean(env[key]))) return undefined;
 
   const required = [
     "SMTP_HOST", "SMTP_PORT", "SMTP_TLS", "SMTP_USER", "SMTP_PASSWORD", "SMTP_TO"

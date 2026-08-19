@@ -1,0 +1,28 @@
+services:
+  browser:
+    image: ghcr.io/browserless/chromium:latest
+    environment:
+      TOKEN: ${BROWSERLESS_TOKEN:-change-me}
+      CONCURRENT: "1"
+      QUEUED: "5"
+      TIMEOUT: "180000"
+      TZ: Asia/Shanghai
+    shm_size: 2gb
+
+  checkin:
+    image: ${CHECKIN_IMAGE:-viewturbo-daily:local}
+    build: .
+    depends_on:
+      - browser
+    environment:
+      BROWSER_WS_ENDPOINT: ws://browser:3000?token=${BROWSERLESS_TOKEN:-change-me}
+      TOKEN_BASE64: ${TOKEN_BASE64:-}
+      LOGIN_CREDENTIALS_BASE64: ${LOGIN_CREDENTIALS_BASE64:-}
+      TIMEOUT_MS: ${TIMEOUT_MS:-60000}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_TLS: ${SMTP_TLS:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_TO: ${SMTP_TO:-}

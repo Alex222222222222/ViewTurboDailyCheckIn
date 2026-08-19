@@ -1,0 +1,66 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: viewturbo-daily
+spec:
+  schedule: "0 1 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          initContainers:
+            - name: browser
+              image: ghcr.io/browserless/chromium:latest
+              restartPolicy: Always
+              env:
+                - name: TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: viewturbo-browser
+                      key: token
+                - name: CONCURRENT
+                  value: "1"
+                - name: TIMEOUT
+                  value: "180000"
+              ports:
+                - name: browser
+                  containerPort: 3000
+              volumeMounts:
+                - name: browser-shm
+                  mountPath: /dev/shm
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: "1"
+                  memory: 1Gi
+          containers:
+            - name: checkin
+              image: ghcr.io/GITHUB_OWNER/REPOSITORY:latest
+              env:
+                - name: BROWSER_WS_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: viewturbo-browser
+                      key: endpoint
+                - name: TOKEN_BASE64
+                  valueFrom:
+                    secretKeyRef:
+                      name: viewturbo-cookie
+                      key: token-base64
+                - name: TIMEOUT_MS
+                  value: "60000"
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
+          volumes:
+            - name: browser-shm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 2Gi
