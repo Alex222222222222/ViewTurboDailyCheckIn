@@ -29,6 +29,20 @@ when the decoded input contains no usable tokens.
 
 ## Docker
 
+Published image:
+
+```text
+ghcr.io/zifanhua/viewturbodaily:latest
+```
+
+Pull it directly from GitHub Container Registry:
+
+```sh
+docker pull ghcr.io/zifanhua/viewturbodaily:latest
+```
+
+Or build it locally:
+
 ```sh
 docker build -t viewturbo-daily .
 docker run --rm \
@@ -105,7 +119,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: check-in
-              image: your-registry/viewturbo-daily:latest
+              image: ghcr.io/zifanhua/viewturbodaily:latest
               env:
                 - name: TOKEN_BASE64
                   valueFrom:
