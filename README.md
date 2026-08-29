@@ -83,7 +83,8 @@ redirected landing page cannot hold the job open.
 
 The page can temporarily show `签到挚会员` while loading account state. The job
 waits up to `TIMEOUT_MS` for an explicit checked (`今日已领`) or unchecked
-(`签到领`) status and clicks only the unchecked state.
+(`签到领`) status. The seventh-day `签到挚会员` state is accepted only after a
+30-second settle period, then the clickable check-in control is used.
 
 ## Failure email
 

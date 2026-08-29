@@ -9,12 +9,17 @@ import {
   sendFailureNotification,
   type FailureSummary
 } from "./notifier.js";
+import {
+  CHECKED_IN_TEXT,
+  SEVENTH_DAY_TEXT,
+  UNCHECKED_TEXT,
+  classifyCheckInTitle
+} from "./checkin-status.js";
 
 const TARGET_URL = "https://viewturbo.org/zh/my";
 const LOGIN_URL = "https://viewturbo.org/zh/login";
 const STATUS_SELECTOR = ".my-checkin-entry__title";
-const CHECKED_IN_TEXT = "今日已领";
-const UNCHECKED_TEXT = "签到领";
+const SEVENTH_DAY_SETTLE_MS = 30_000;
 
 type CheckInStatus =
   | "already_checked_in"
@@ -146,18 +151,35 @@ async function checkIn(
       await login(page, credentials, timeout);
     }
     await page.goto(TARGET_URL, { waitUntil: "domcontentloaded", timeout });
+    const seventhDayReadyAt = Date.now() + Math.min(SEVENTH_DAY_SETTLE_MS, timeout);
 
     try {
       await page.waitForFunction(
-        (selector: string, checked: string, unchecked: string) => {
+        (
+          selector: string,
+          checked: string,
+          unchecked: string,
+          seventhDay: string,
+          seventhDayReadyAt: number
+        ) => {
           const path = window.location.pathname.replace(/\/$/, "");
-          const text = document.querySelector(selector)?.textContent ?? "";
-          return path !== "/zh/my" || text.includes(checked) || text.includes(unchecked);
+          const title = document.querySelector(selector);
+          const text = title?.textContent ?? "";
+          const settledSeventhDay =
+            Date.now() >= seventhDayReadyAt &&
+            text.includes(seventhDay) &&
+            title?.closest("button.my-checkin-entry") !== null;
+          return path !== "/zh/my" ||
+            text.includes(checked) ||
+            text.includes(unchecked) ||
+            settledSeventhDay;
         },
         { timeout },
         STATUS_SELECTOR,
         CHECKED_IN_TEXT,
-        UNCHECKED_TEXT
+        UNCHECKED_TEXT,
+        SEVENTH_DAY_TEXT,
+        seventhDayReadyAt
       );
     } catch {
       const unsettled = await page
@@ -173,11 +195,12 @@ async function checkIn(
     }
 
     const before = await getStatusText(page);
-    if (before.includes(CHECKED_IN_TEXT)) {
+    const state = classifyCheckInTitle(before);
+    if (state === "checked") {
       return { account, status: "already_checked_in", message: before };
     }
 
-    if (!before.includes(UNCHECKED_TEXT)) {
+    if (state !== "unchecked" && state !== "seventh_day") {
       throw new Error(`unrecognized check-in status: ${JSON.stringify(before)}`);
     }
 
